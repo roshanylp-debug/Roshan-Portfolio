@@ -480,13 +480,14 @@ footer a { color: var(--sage-bright); }
     </div>
 
     <form id="contact-form" novalidate>
+      <input type="text" name="_honey" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
       <div class="field"><label for="f-name">Your name</label><input id="f-name" name="name" placeholder="Enter your name" required></div>
       <div class="field"><label for="f-email">Email address</label><input id="f-email" name="email" type="email" placeholder="you@example.com"></div>
       <div class="field full"><label for="f-phone">Phone number</label><input id="f-phone" name="phone" type="tel" placeholder="Enter your phone number"></div>
       <div class="field full"><label for="f-msg">Your message</label><textarea id="f-msg" name="message" placeholder="Tell me about your brand, monthly ad budget and the platforms you're on…" required></textarea></div>
       <div class="form-foot">
         <button type="submit" class="btn fill">Send message <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M7 17 17 7M8 7h9v9"/></svg></button>
-        <p class="form-note" id="form-note" aria-live="polite">Your message opens in WhatsApp, ready to send.</p>
+        <p class="form-note" id="form-note" aria-live="polite">Your message comes straight to my inbox.</p>
       </div>
     </form>
   </div>
@@ -589,19 +590,65 @@ window.addEventListener('load', () => requestAnimationFrame(() => document.docum
   document.querySelectorAll('.filters button').forEach(b => b.addEventListener('click', () => requestAnimationFrame(all)));
 })();
 
-// Contact form → WhatsApp message
-document.getElementById('contact-form').addEventListener('submit', function (e) {
-  e.preventDefault();
+// Contact form → email (via FormSubmit), WhatsApp as fallback
+(function () {
+  const form = document.getElementById('contact-form');
   const note = document.getElementById('form-note');
-  const name = this.name.value.trim(), msg = this.message.value.trim();
-  if (!name || !msg) { note.textContent = 'Please add your name and a short message.'; return; }
-  const text = `Hi Roshan, I'm ${name}.` +
-    (this.email.value.trim() ? `\nEmail: ${this.email.value.trim()}` : '') +
-    (this.phone.value.trim() ? `\nPhone: ${this.phone.value.trim()}` : '') +
-    `\n\n${msg}`;
-  const url = 'https://wa.me/919746962462?text=' + encodeURIComponent(text);
-  note.innerHTML = 'Message ready. <a href="' + url + '" target="_blank" rel="noopener">Open WhatsApp to send it</a>';
-});
+  const btn = form.querySelector('button[type="submit"]');
+  const btnHTML = btn.innerHTML;
+  const ENDPOINT = 'https://formsubmit.co/ajax/roshanylp@gmail.com';
+
+  function waLink(d) {
+    const text = `Hi Roshan, I'm ${d.name}.` +
+      (d.email ? `\nEmail: ${d.email}` : '') +
+      (d.phone ? `\nPhone: ${d.phone}` : '') +
+      `\n\n${d.message}`;
+    return 'https://wa.me/919746962462?text=' + encodeURIComponent(text);
+  }
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const el = form.elements;
+    if (el._honey.value) return; // spam bot
+    const d = {
+      name: el.name.value.trim(),
+      email: el.email.value.trim(),
+      phone: el.phone.value.trim(),
+      message: el.message.value.trim()
+    };
+    if (!d.name || !d.message) { note.textContent = 'Please add your name and a short message.'; return; }
+    if (d.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) { note.textContent = 'Please check your email address.'; return; }
+    if (!d.email && !d.phone) { note.textContent = 'Please add an email or phone number so I can reply.'; return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    note.textContent = '';
+    try {
+      const res = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          ...d,
+          _subject: `New portfolio enquiry from ${d.name}`,
+          _template: 'table',
+          _captcha: 'false'
+        })
+      });
+      const out = await res.json().catch(() => ({}));
+      if (res.ok && String(out.success) === 'true') {
+        form.reset();
+        note.textContent = 'Thanks! Your message has been sent. I\'ll get back to you shortly.';
+      } else {
+        throw new Error(out.message || 'Send failed');
+      }
+    } catch (err) {
+      note.innerHTML = 'Couldn\'t send right now. <a href="' + waLink(d) + '" target="_blank" rel="noopener">Send it on WhatsApp instead</a>';
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = btnHTML;
+    }
+  });
+})();
 </script>
 </body>
 </html>
