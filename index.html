@@ -261,6 +261,7 @@ form { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 26px; 
 .field textarea { min-height: 130px; resize: vertical; }
 .form-foot { grid-column: 1 / -1; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
 .form-note { font-size: 13px; color: var(--muted); }
+.form-note:empty { display: none; }
 .form-note a { color: var(--sage-bright); font-weight: 700; border-bottom: 1px solid var(--sage); }
 
 footer { border-top: 1px solid var(--line); padding: 26px var(--gutter); text-align: center; font-size: 13.5px; color: var(--muted); }
@@ -487,7 +488,7 @@ footer a { color: var(--sage-bright); }
       <div class="field full"><label for="f-msg">Your message</label><textarea id="f-msg" name="message" placeholder="Tell me about your brand, monthly ad budget and the platforms you're on…" required></textarea></div>
       <div class="form-foot">
         <button type="submit" class="btn fill">Send message <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M7 17 17 7M8 7h9v9"/></svg></button>
-        <p class="form-note" id="form-note" aria-live="polite">Your message comes straight to my inbox.</p>
+        <p class="form-note" id="form-note" aria-live="polite"></p>
       </div>
     </form>
   </div>
@@ -606,7 +607,7 @@ window.addEventListener('load', () => requestAnimationFrame(() => document.docum
     return 'https://wa.me/919746962462?text=' + encodeURIComponent(text);
   }
 
-  form.addEventListener('submit', async function (e) {
+  form.addEventListener('submit', function (e) {
     e.preventDefault();
     const el = form.elements;
     if (el._honey.value) return; // spam bot
@@ -620,33 +621,29 @@ window.addEventListener('load', () => requestAnimationFrame(() => document.docum
     if (d.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) { note.textContent = 'Please check your email address.'; return; }
     if (!d.email && !d.phone) { note.textContent = 'Please add an email or phone number so I can reply.'; return; }
 
-    btn.disabled = true;
-    btn.textContent = 'Sending…';
+    // Show success instantly; delivery continues in the background
     note.textContent = '';
-    try {
-      const res = await fetch(ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({
-          ...d,
-          _subject: `New portfolio enquiry from ${d.name}`,
-          _template: 'table',
-          _captcha: 'false'
-        })
+    form.reset();
+    btn.disabled = true;
+    btn.textContent = 'Message sent ✓';
+    setTimeout(() => { btn.disabled = false; btn.innerHTML = btnHTML; }, 4000);
+
+    fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        ...d,
+        _subject: `New portfolio enquiry from ${d.name}`,
+        _template: 'table',
+        _captcha: 'false'
+      })
+    })
+      .then(res => res.json().then(out => { if (!res.ok || String(out.success) !== 'true') throw 0; }))
+      .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = btnHTML;
+        note.innerHTML = 'Couldn\'t send right now. <a href="' + waLink(d) + '" target="_blank" rel="noopener">Send it on WhatsApp instead</a>';
       });
-      const out = await res.json().catch(() => ({}));
-      if (res.ok && String(out.success) === 'true') {
-        form.reset();
-        note.textContent = 'Thanks! Your message has been sent. I\'ll get back to you shortly.';
-      } else {
-        throw new Error(out.message || 'Send failed');
-      }
-    } catch (err) {
-      note.innerHTML = 'Couldn\'t send right now. <a href="' + waLink(d) + '" target="_blank" rel="noopener">Send it on WhatsApp instead</a>';
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = btnHTML;
-    }
   });
 })();
 </script>
