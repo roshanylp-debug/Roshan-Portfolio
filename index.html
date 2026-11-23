@@ -597,7 +597,8 @@ window.addEventListener('load', () => requestAnimationFrame(() => document.docum
   const note = document.getElementById('form-note');
   const btn = form.querySelector('button[type="submit"]');
   const btnHTML = btn.innerHTML;
-  const ENDPOINT = 'https://formsubmit.co/ajax/roshanylp@gmail.com';
+  const ENDPOINT = 'https://api.web3forms.com/submit';
+  const ACCESS_KEY = '66d73247-15cb-4615-b628-0dac0767c72e'; // Web3Forms public key → roshanylp@gmail.com
 
   function waLink(d) {
     const text = `Hi Roshan, I'm ${d.name}.` +
@@ -632,13 +633,16 @@ window.addEventListener('load', () => requestAnimationFrame(() => document.docum
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({
-        ...d,
-        _subject: `New portfolio enquiry from ${d.name}`,
-        _template: 'table',
-        _captcha: 'false'
+        access_key: ACCESS_KEY,
+        subject: `New portfolio enquiry from ${d.name}`,
+        from_name: 'Roshan Portfolio',
+        name: d.name,
+        email: d.email || undefined,
+        phone: d.phone || '—',
+        message: d.message
       })
     })
-      .then(res => res.json().then(out => { if (!res.ok || String(out.success) !== 'true') throw 0; }))
+      .then(res => res.json().then(out => { if (!res.ok || out.success !== true) throw 0; }))
       .catch(() => {
         btn.disabled = false;
         btn.innerHTML = btnHTML;
